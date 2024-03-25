@@ -39,4 +39,26 @@ for piece_name in list(dataset.keys()):
     if not found_overlap:
         no_overlaps.append((nmat, root, mode, tonic))
 
+#function for later, takes out the last note/group of notes if there are several at the same time
+#for the model to predict it given the original sequence
+#this function assumes no note overlaps
+#returns a tuple (array of last note group, array of notes beforehand)
+def separate_last_note_group(nmat):
+    x = len(nmat)-1 #index for last note
+    last_group =[]
+    for i in range(x, -1, -1):
+        curr = nmat[i]
+        if curr[0] != nmat[x][0]:
+            break
+        last_group.append(curr)
+    last_group.reverse()
+    return last_group, nmat[:-(len(last_group))]
+
+#testing
+"""
+piece = no_overlaps[1100][0]
+print(f'original: {piece}')
+last_group, all_but_last = separate_last_note_group(piece)
+print(f'last note group: {last_group}, all but last: {all_but_last}')
+"""
 
