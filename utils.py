@@ -23,7 +23,7 @@ def preprocess():
     for piece_name in tqdm(list(dataset.keys())):
         notes_per_time = {}
         piece = dataset[piece_name]
-        nmat = piece['nmat']
+        nmat = sorted(piece['nmat'], key=lambda note: note[0])
         piece_length = nmat[len(nmat)-1][1] #last time of last note playing
         for i in range(0, piece_length+1): #for each second, what notes are playing?
             amplitudes = []
