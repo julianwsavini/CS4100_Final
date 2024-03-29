@@ -15,11 +15,13 @@ def midi_to_note(midi_number):
 
 
 """
-Returns an array of 
+Returns a dictionary with {piece name, details dict} 
     dictionaries for every piece {time, (mean amplitude, [notes at that point])}
+We choose to keep the piece names here so we can later find mode or other attributes 
+using dataset[piece_name]['mode']
 """
 def preprocess():
-    all_pieces = list()
+    all_pieces = {}
     for piece_name in tqdm(list(dataset.keys())):
         notes_per_time = {}
         piece = dataset[piece_name]
@@ -36,7 +38,7 @@ def preprocess():
                     break
             mean_amp = 0 if amplitudes==[] else statistics.mean(amplitudes)
             notes_per_time[i] = (mean_amp, notes)
-        all_pieces.append(notes_per_time)
+        all_pieces[piece_name] = notes_per_time
     return all_pieces
 
 pieces_beats = preprocess()
@@ -58,17 +60,18 @@ def separate_last_note_group(piece, x):
 
 """
 Separate preprocessed data into training(80%), validation(10%), and test(10%) sets.
+Takes in a dict {piece_name, details} where details is a dict {time, (mean amplitude, [notes at that point])}
 Returns a tuple (training, validation, test)
 """
-def separate_for_training(pieces):
+def separate_for_training(all_pieces):
+    pieces = list(all_pieces.items())
     train_end_idx = int(0.8 * len(pieces))
     validate_end_idx = int(0.9 * len(pieces))
 
-    train = pieces[:train_end_idx]
-    validate = pieces[train_end_idx:validate_end_idx]
-    test = pieces[validate_end_idx:]
+    train = dict(pieces[:train_end_idx])
+    validate = dict(pieces[train_end_idx:validate_end_idx])
+    test = dict(pieces[validate_end_idx:])
 
     return train, validate, test
 
 train, validate, test = separate_for_training(pieces_beats)
-
