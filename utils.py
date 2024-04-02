@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import librosa
 import matplotlib.pyplot as plt
+import random
 
 with open('dataset.pkl', 'rb') as file:
     dataset:dict = pickle.load(file)
@@ -45,7 +46,7 @@ def preprocess():
         all_pieces[piece_name] = notes_per_time
     return all_pieces
 
-pieces_beats = preprocess()
+#pieces_beats = preprocess()
 
 """
 For validation/testing, separates a given piece into x last beats and len-x previous notes/chords.
@@ -64,21 +65,24 @@ def separate_last_note_group(piece, x):
 
 """
 Separate preprocessed data into training(80%), validation(10%), and test(10%) sets.
-Takes in a dict {piece_name, details} where details is a dict {time, (mean amplitude, [notes at that point])}
-Returns a tuple (training, validation, test)
+Takes in a the datasdet
+Returns a tuple (training, validation, test) of lists of piece names
 """
-def separate_for_training(all_pieces):
-    pieces = list(all_pieces.items())
+
+def separate_for_training(dataset):
+    pieces = list(dataset.keys())
+    random.shuffle(pieces)
     train_end_idx = int(0.8 * len(pieces))
     validate_end_idx = int(0.9 * len(pieces))
-
-    train = dict(pieces[:train_end_idx])
-    validate = dict(pieces[train_end_idx:validate_end_idx])
-    test = dict(pieces[validate_end_idx:])
+    train = pieces[:train_end_idx]
+    validate = pieces[train_end_idx:validate_end_idx]
+    test = pieces[validate_end_idx:]
 
     return train, validate, test
 
-train, validate, test = separate_for_training(pieces_beats)
+train, validate, test = separate_for_training(dataset)
+
+
 
 
 '''Takes in name of sample (str) and outputs the labeled progression of either length 32 or length 64
@@ -231,6 +235,6 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix.loc['<E>', '<E>'] = 1
 
     return transition_prob_matrix
-
+"""
 def calculate_initial_probabilities(filenames):
-    
+"""
