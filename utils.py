@@ -136,3 +136,49 @@ def calculate_transition_probabilites(chroma):
 """
 def calculate_initial_probabilities(filenames):
 """
+
+def predict(pcp, model, mu):
+    """
+    :param pcp: chroma
+    :param model: the hmm model
+    :return: the pcp, with a column with the predicted chords
+    """
+    preds = model.predict(pcp)
+
+    chords = mu.index.values
+    chord_idxs = range(len(mu.index.values))
+
+    map = {chord_num: chord_letter for chord_num, chord_letter in zip(chord_idxs, chords)}
+
+    preds_str = np.array([map[chord_ix] for chord_ix in preds])
+
+    pcp['predictions'] = preds_str
+
+    return pcp
+
+
+def get_unique_predicted(pcp):
+    """
+    :param pcp: chroma, with predicted column
+    :return: filtered preds, a filtered chroma with note changes
+    """
+    predictions_list = pcp['predictions'].tolist()
+
+    # Initialize an empty list to store the boolean values
+    chord_unique = []
+
+    # Iterate over the list, comparing each element with the previous one
+    for i in range(len(predictions_list)):
+        if i == 0:
+            chord_unique.append(True)
+        else:
+            if predictions_list[i] != predictions_list[i - 1]:
+                chord_unique.append(True)
+            else:
+                chord_unique.append(False)
+
+    chord_unique = pd.Series(chord_unique)
+    chord_unique_idxs = chord_unique[chord_unique == True].index
+    filtered_preds = pcp.loc[chord_unique_idxs].copy()
+    filtered_preds['start'] = np.array([0] + filtered_preds['end'][:-1].tolist())
+    return filtered_preds[['predictions', 'start', 'end']]
