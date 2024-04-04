@@ -8,6 +8,7 @@ import librosa
 import matplotlib.pyplot as plt
 import random
 from chroma import *
+import traceback
 
 with open('dataset.pkl', 'rb') as file:
     dataset:dict = pickle.load(file)
@@ -85,7 +86,7 @@ train, validate, test = separate_for_training(dataset)
 
 
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['M', 'm', 'dim']]
+FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
 
 ## TODO: mu array
 
@@ -113,7 +114,6 @@ def calculate_chord_prob(chord_notes):
     return group_count
 
 def calculate_transition_probabilites(chroma):
-    
     initial_chords = chroma.chord[:-1]
     following_chords = chroma.chord[1:]
 
@@ -145,7 +145,7 @@ def get_initial_chord(file_name):
     chord = list(set(get_progression(file_name)))[0]
     if chord not in seq_scale:
         # define regex pattern to get an instance of the chord
-        pattern = fr'\b\w*{chord}\w*\b'
+        pattern = r'\b\w*{}\w*\b'.format(re.escape(chord))
         # join list of chords into a single string to parse for regex and replace in chroma labels
         # each seq_scale is of length 7
         scale_to_string = (' ').join(seq_scale)
@@ -153,8 +153,8 @@ def get_initial_chord(file_name):
         found_chords = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)
         if found_chords:
             chord = found_chords[0]
-    #add appropriate suffix if it is missing
-    chord = chord if any(suffix in chord for suffix in ["m", "dim", "M"]) else f"{chord}{mode}"
+        else:
+            return None
     return chord
 
 #returns all initial probabilities, also adapts for dimensions of transition matrix
@@ -162,7 +162,9 @@ def calculate_initial_probabilities(filenames, transition_matrix):
     first_chords = []
     # Get all initial chords
     for file_name in filenames:
-        first_chords.append(get_initial_chord(file_name))
+        chord = get_initial_chord(file_name)
+        if chord is not None:
+            first_chords.append(chord)
     chord_counts = np.unique(first_chords, return_counts=True)
     total_num_chords = chord_counts[1].sum()
     # Create a Series from the counts
@@ -171,7 +173,6 @@ def calculate_initial_probabilities(filenames, transition_matrix):
     total_num_adapted = adapted_initials.sum()
     adapted_initials = adapted_initials/total_num_adapted
     return adapted_initials.fillna(0)
-
 
 def predict(pcp, model, mu):
     """
