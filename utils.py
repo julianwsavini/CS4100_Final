@@ -8,6 +8,7 @@ import librosa
 import matplotlib.pyplot as plt
 import random
 from chroma import *
+import traceback
 
 
 midi_to_note_dict = {}
@@ -28,7 +29,6 @@ def preprocess(filename):
 
     with open(filename, 'rb') as file:
         dataset:dict = pickle.load(file)
-
     all_pieces = {}
     for piece_name in tqdm(list(dataset.keys())):
         notes_per_time = {}
@@ -50,7 +50,6 @@ def preprocess(filename):
     return all_pieces
 
 #pieces_beats = preprocess()
-
 """
 For validation/testing, separates a given piece into x last beats and len-x previous notes/chords.
 Takes in a dictionary {beat, (mean amplitude, [notes at that point])}
@@ -87,9 +86,9 @@ def separate_for_training(dataset, train_pct, val_pct):
 
 
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
 
-
-## TODO: inital probs, transition probs, emission probs, mu array
+## TODO: mu array
 
 def calculate_mu_from_chroma(chroma):
     ''' 
@@ -136,9 +135,46 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix.loc['<E>', '<E>'] = 1
 
     return transition_prob_matrix
-"""
-def calculate_initial_probabilities(filenames):
-"""
+
+def get_initial_chord(file_name):
+    mode = midi_data[file_name]['mode']
+    # check if sequence is in a minor or major scale
+    if mode == 'm':
+        seq_scale = get_minor_scale(NOTES_NAMES, file_name)
+    else:
+        seq_scale = get_maj_scale(NOTES_NAMES, file_name)
+    # get the first chord
+    chord = list(set(get_progression(file_name)))[0]
+    if chord not in seq_scale:
+        # define regex pattern to get an instance of the chord
+        pattern = r'\b\w*{}\w*\b'.format(re.escape(chord))
+        # join list of chords into a single string to parse for regex and replace in chroma labels
+        # each seq_scale is of length 7
+        scale_to_string = (' ').join(seq_scale)
+        # find true chord
+        found_chords = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)
+        if found_chords:
+            chord = found_chords[0]
+        else:
+            return None
+    return chord
+
+#returns all initial probabilities, also adapts for dimensions of transition matrix
+def calculate_initial_probabilities(filenames, transition_matrix):
+    first_chords = []
+    # Get all initial chords
+    for file_name in filenames:
+        chord = get_initial_chord(file_name)
+        if chord is not None:
+            first_chords.append(chord)
+    chord_counts = np.unique(first_chords, return_counts=True)
+    total_num_chords = chord_counts[1].sum()
+    # Create a Series from the counts
+    initial_probs = pd.Series(chord_counts[1]/total_num_chords, index=chord_counts[0])
+    adapted_initials = initial_probs[transition_matrix.columns.values]
+    total_num_adapted = adapted_initials.sum()
+    adapted_initials = adapted_initials/total_num_adapted
+    return adapted_initials.fillna(0)
 
 def predict(pcp, model, mu):
     """
