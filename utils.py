@@ -221,3 +221,13 @@ def get_unique_predicted(pcp):
     filtered_preds = pcp.loc[chord_unique_idxs].copy()
     filtered_preds['start'] = np.array([0] + filtered_preds['end'][:-1].tolist())
     return filtered_preds[['predictions', 'start', 'end']]
+
+def format_indiv_chroma(unformatted_chroma:pd.DataFrame):
+    # TODO: determine what values go in the start and end rows
+    zeroed_vals = [[0 for i in range(unformatted_chroma.shape[1])]]
+    start = pd.DataFrame([zeroed_vals[0][:-1] + [['<S>']]], columns=unformatted_chroma.columns)
+    middle = unformatted_chroma
+    end = pd.DataFrame([zeroed_vals[0][:-1] + [['<E>']]], columns=unformatted_chroma.columns)
+
+    formatted_chroma = pd.concat([start, middle, end]).reset_index(drop=True)
+    return formatted_chroma
