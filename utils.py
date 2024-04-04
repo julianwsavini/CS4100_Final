@@ -116,6 +116,7 @@ def calculate_chord_prob(chord_notes):
 
 def calculate_transition_probabilites(chroma):
     
+    # Look into splitting between songs somehow
     initial_chords = chroma['Chord Actual'].values[:-1]
     following_chords = chroma['Chord Actual'][1:].tolist()
 
