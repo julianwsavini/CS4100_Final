@@ -101,7 +101,7 @@ def calculate_emission_from_chroma(chroma):
     
     matrices = []
 
-    for chord, group in chroma.groupby('chord'):
+    for chord, group in chroma.groupby('Chord Actual'):
         chord_cov_matrix = group[NOTES_NAMES].cov().values
         matrices.append(chord_cov_matrix)
 
@@ -110,14 +110,14 @@ def calculate_emission_from_chroma(chroma):
 def calculate_chord_prob(chord_notes):
     group_count = chord_notes.groupby('following_chords').size().reset_index()
     group_count.columns = ['following_chords', 'count']
-    total = group_count.count.sum()
-    group_count['transition_probability'] = group_count.count / total
+    total = group_count['count'].sum()
+    group_count['transition_probability'] = group_count['count'] / total
     return group_count
 
 def calculate_transition_probabilites(chroma):
     
-    initial_chords = chroma.chord[:-1]
-    following_chords = chroma.chord[1:]
+    initial_chords = chroma['Chord Actual'].values[:-1]
+    following_chords = chroma['Chord Actual'][1:].tolist()
 
     sequence_df = pd.DataFrame({'initial_chords': initial_chords, 'following_chords': following_chords})
 
@@ -126,7 +126,7 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix = transition_prob_matrix.pivot(index='initial_chords', columns='following_chords', values='transition_probability')
 
     # Transition probabilities for start and end states
-    transition_prob_matrix.append(pd.Series(np.zeros(transition_prob_matrix.shape[1]), name='<E>'))
+    transition_prob_matrix['<E>'] = pd.Series(np.zeros(transition_prob_matrix.shape[1]), name='<E>')
 
     transition_prob_matrix = transition_prob_matrix.fillna(0)
 

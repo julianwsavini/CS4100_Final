@@ -207,7 +207,9 @@ def get_chromagram(midi_seq, midi_data):
             # define regex pattern to get an instance of the chord 
             pattern = fr'\b\w*{chord}\w*\b'
             # replace the root labels with the true 
-            true_chord = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)[0]
+            matches = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)
+            if len(matches) == 0: continue
+            true_chord = matches[0]
             # realign the labels from sequence scale information
             chroma_map['Chord Actual'] = chroma_map['Chord Actual'].replace(to_replace=chord, value=true_chord)
     # filter out sequences that have nothing at end 
