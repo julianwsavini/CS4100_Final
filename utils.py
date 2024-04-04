@@ -9,8 +9,6 @@ import matplotlib.pyplot as plt
 import random
 from chroma import *
 
-with open('dataset.pkl', 'rb') as file:
-    dataset:dict = pickle.load(file)
 
 midi_to_note_dict = {}
 
@@ -26,7 +24,11 @@ Returns a dictionary with {piece name, details dict}
 We choose to keep the piece names here so we can later find mode or other attributes 
 using dataset[piece_name]['mode']
 """
-def preprocess():
+def preprocess(filename):
+
+    with open(filename, 'rb') as file:
+        dataset:dict = pickle.load(file)
+
     all_pieces = {}
     for piece_name in tqdm(list(dataset.keys())):
         notes_per_time = {}
@@ -70,18 +72,18 @@ Takes in a the datasdet
 Returns a tuple (training, validation, test) of lists of piece names
 """
 
-def separate_for_training(dataset):
+def separate_for_training(dataset, train_pct, val_pct):
     pieces = list(dataset.keys())
     random.shuffle(pieces)
-    train_end_idx = int(0.8 * len(pieces))
-    validate_end_idx = int(0.9 * len(pieces))
+    train_end_idx = int(train_pct * len(pieces))
+    validate_end_idx = int((train_pct + val_pct) * len(pieces))
     train = pieces[:train_end_idx]
     validate = pieces[train_end_idx:validate_end_idx]
     test = pieces[validate_end_idx:]
 
     return train, validate, test
 
-train, validate, test = separate_for_training(dataset)
+# train, validate, test = separate_for_training(dataset, .8, .1)
 
 
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
