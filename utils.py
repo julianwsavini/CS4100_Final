@@ -10,8 +10,6 @@ import random
 from chroma import *
 import traceback
 
-with open('dataset.pkl', 'rb') as file:
-    dataset:dict = pickle.load(file)
 
 midi_to_note_dict = {}
 
@@ -26,8 +24,11 @@ Returns a dictionary with {piece name, details dict}
     dictionaries for every piece {time, (mean amplitude, [notes at that point])}
 We choose to keep the piece names here so we can later find mode or other attributes 
 using dataset[piece_name]['mode']
+"""
+def preprocess(filename):
 
-def preprocess():
+    with open(filename, 'rb') as file:
+        dataset:dict = pickle.load(file)
     all_pieces = {}
     for piece_name in tqdm(list(dataset.keys())):
         notes_per_time = {}
@@ -50,7 +51,6 @@ def preprocess():
 
 #pieces_beats = preprocess()
 """
-"""
 For validation/testing, separates a given piece into x last beats and len-x previous notes/chords.
 Takes in a dictionary {beat, (mean amplitude, [notes at that point])}
 and x=number of beats to separate form the end
@@ -71,18 +71,18 @@ Takes in a the datasdet
 Returns a tuple (training, validation, test) of lists of piece names
 """
 
-def separate_for_training(dataset):
+def separate_for_training(dataset, train_pct, val_pct):
     pieces = list(dataset.keys())
     random.shuffle(pieces)
-    train_end_idx = int(0.8 * len(pieces))
-    validate_end_idx = int(0.9 * len(pieces))
+    train_end_idx = int(train_pct * len(pieces))
+    validate_end_idx = int((train_pct + val_pct) * len(pieces))
     train = pieces[:train_end_idx]
     validate = pieces[train_end_idx:validate_end_idx]
     test = pieces[validate_end_idx:]
 
     return train, validate, test
 
-train, validate, test = separate_for_training(dataset)
+# train, validate, test = separate_for_training(dataset, .8, .1)
 
 
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -100,7 +100,7 @@ def calculate_emission_from_chroma(chroma):
     
     matrices = []
 
-    for chord, group in chroma.groupby('chord'):
+    for chord, group in chroma.groupby('Chord Actual'):
         chord_cov_matrix = group[NOTES_NAMES].cov().values
         matrices.append(chord_cov_matrix)
 
@@ -109,13 +109,15 @@ def calculate_emission_from_chroma(chroma):
 def calculate_chord_prob(chord_notes):
     group_count = chord_notes.groupby('following_chords').size().reset_index()
     group_count.columns = ['following_chords', 'count']
-    total = group_count.count.sum()
-    group_count['transition_probability'] = group_count.count / total
+    total = group_count['count'].sum()
+    group_count['transition_probability'] = group_count['count'] / total
     return group_count
 
 def calculate_transition_probabilites(chroma):
-    initial_chords = chroma.chord[:-1]
-    following_chords = chroma.chord[1:]
+    
+    # Look into splitting between songs somehow
+    initial_chords = chroma['Chord Actual'].values[:-1]
+    following_chords = chroma['Chord Actual'][1:].tolist()
 
     sequence_df = pd.DataFrame({'initial_chords': initial_chords, 'following_chords': following_chords})
 
@@ -124,7 +126,7 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix = transition_prob_matrix.pivot(index='initial_chords', columns='following_chords', values='transition_probability')
 
     # Transition probabilities for start and end states
-    transition_prob_matrix.append(pd.Series(np.zeros(transition_prob_matrix.shape[1]), name='<E>'))
+    transition_prob_matrix['<E>'] = pd.Series(np.zeros(transition_prob_matrix.shape[1]), name='<E>')
 
     transition_prob_matrix = transition_prob_matrix.fillna(0)
 

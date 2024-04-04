@@ -8,8 +8,8 @@ import re
 import seaborn as sns
 from scipy.ndimage import gaussian_filter
 
-with open(r"dataset.pkl", 'rb') as data:
-    midi_data = pickle.load(data)
+# with open(r"dataset.pkl", 'rb') as data:
+#     midi_data = pickle.load(data)
 
 notes =  ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -21,7 +21,7 @@ notes =  ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
         list with elements being the roots of the chord labels        
 '''
 # get an array equal to the length of the note matrix where each element is the root note at time n 
-def get_progression(midi_seq):
+def get_progression(midi_seq, midi_data):
     seq = midi_data[midi_seq]
     roots = np.array(seq['root'])
     roots = roots.flatten()
@@ -36,7 +36,7 @@ def get_progression(midi_seq):
         string with the key of the progression (including either min or major)    
 '''
 # use tonic and mode info to get key of the progression
-def get_key(midi_seq):
+def get_key(midi_seq, midi_data):
     seq = midi_data[midi_seq]
     tonic = seq['tonic']
     mode = seq['mode']
@@ -53,12 +53,12 @@ def get_key(midi_seq):
         dictionary with # eigth note as key and 
         a dictionary as the values that has notes as key and amplitude as value
 '''
-def get_note_map(midi_seq):
+def get_note_map(midi_seq, midi_data):
     seq = midi_data[midi_seq]
     #get note matrix
     nmat = seq['nmat']
     # get duration from length of progression
-    progression = get_progression(midi_seq)
+    progression = get_progression(midi_seq, midi_data)
     len_sequence = len(progression)
     beats = range(len_sequence + 1)
     # create empty map with the # of beats as the key
@@ -108,7 +108,7 @@ Parameters:
 Output:
     chords in the key of the provided sequence name
 '''
-def get_maj_scale(notes, midi_seq):
+def get_maj_scale(notes, midi_seq, midi_data):
     seq = midi_data[midi_seq]
     key_chords = []
     # get key info
@@ -142,7 +142,7 @@ Parameters:
 Output:
     chords in the key of the provided sequence name
 '''
-def get_minor_scale(notes, midi_seq):
+def get_minor_scale(notes, midi_seq, midi_data):
     seq = midi_data[midi_seq]
     key_chords = []
     # get key info
@@ -177,11 +177,11 @@ Output:
     contains the labeled root of the chord at that time 
 '''
 
-def get_chromagram(midi_seq):
+def get_chromagram(midi_seq, midi_data):
     # get map of times and note amplitudes at each time
-    note_data = get_note_map(midi_seq)
+    note_data = get_note_map(midi_seq, midi_data)
     # get progression from roots
-    progression = get_progression(midi_seq)
+    progression = get_progression(midi_seq, midi_data)
     duration = len(progression)
     # get the amplitude values of each note bin for all times 
     map = [list(note_data[time].values()) for time in range(duration)] 
@@ -190,9 +190,9 @@ def get_chromagram(midi_seq):
     seq = midi_data[midi_seq]
     # check if sequence is in a minor or major scale
     if seq['mode'] == 'm':
-        seq_scale = get_minor_scale(notes, midi_seq)
+        seq_scale = get_minor_scale(notes, midi_seq, midi_data)
     else:
-        seq_scale = get_maj_scale(notes, midi_seq)
+        seq_scale = get_maj_scale(notes, midi_seq, midi_data)
     # get current chords from chromagram
     roots_in_seq = list(set(progression))
     # join list of chords into a single string to parse for regex and replace in chroma labels
@@ -207,7 +207,9 @@ def get_chromagram(midi_seq):
             # define regex pattern to get an instance of the chord 
             pattern = fr'\b\w*{chord}\w*\b'
             # replace the root labels with the true 
-            true_chord = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)[0]
+            matches = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)
+            if len(matches) == 0: continue
+            true_chord = matches[0]
             # realign the labels from sequence scale information
             chroma_map['Chord Actual'] = chroma_map['Chord Actual'].replace(to_replace=chord, value=true_chord)
     # filter out sequences that have nothing at end 
@@ -222,11 +224,11 @@ Parameters:
 Output:
     chromagram plot: heatmap with times as columns, note bins as rows, and values within each box is the amplitude of the note at that time
 '''
-def get_chromagram_plot(midi_seq):
+def get_chromagram_plot(midi_seq, midi_data):
     # get map of times and note amplitudes at each time
-    note_data = get_note_map(midi_seq)
+    note_data = get_note_map(midi_seq, midi_data)
     # get progression from roots
-    progression = get_progression(midi_seq)
+    progression = get_progression(midi_seq, midi_data)
     duration = len(progression)
     # get times from eigth notes -> each note is 0.25 seconds
     times = np.arange(start=0, stop=(duration * 0.25), step=0.25)
