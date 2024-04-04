@@ -205,7 +205,7 @@ def get_chromagram(midi_seq, midi_data):
     for chord in roots_in_seq:
         if chord not in seq_scale:
             # define regex pattern to get an instance of the chord 
-            pattern = fr'\b\w*{chord}\w*\b'
+            pattern = r'\b\w*{}\w*\b'.format(re.escape(chord))
             # replace the root labels with the true 
             matches = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)
             if len(matches) == 0: continue
