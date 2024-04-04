@@ -88,8 +88,6 @@ def separate_for_training(dataset, train_pct, val_pct):
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
 
-## TODO: mu array
-
 def calculate_mu_from_chroma(chroma):
     ''' 
     
@@ -114,7 +112,6 @@ def calculate_chord_prob(chord_notes):
     return group_count
 
 def calculate_transition_probabilites(chroma):
-    
     # Look into splitting between songs somehow
     initial_chords = chroma['Chord Actual'].values[:-1]
     following_chords = chroma['Chord Actual'][1:].tolist()
@@ -134,7 +131,16 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix.loc['<E>'] = 0
     transition_prob_matrix.loc['<E>', '<E>'] = 1
 
-    return transition_prob_matrix
+    # Initialize a 36x36 DataFrame with zeros
+    all_chords_matrix = pd.DataFrame(0, index=FULL_CHORD_LIST, columns=FULL_CHORD_LIST)
+
+    # Update this matrix with the calculated transition probabilities
+    all_chords_matrix.update(transition_prob_matrix)
+
+    # Fill any NaN values with 0
+    all_chords_matrix = all_chords_matrix.fillna(0)
+    return all_chords_matrix
+
 
 def get_initial_chord(file_name):
     mode = midi_data[file_name]['mode']
@@ -160,7 +166,8 @@ def get_initial_chord(file_name):
     return chord
 
 #returns all initial probabilities, also adapts for dimensions of transition matrix
-def calculate_initial_probabilities(filenames, transition_matrix):
+#returns a 36x1 of probabilities for each chord
+def calculate_initial_probabilities(filenames):
     first_chords = []
     # Get all initial chords
     for file_name in filenames:
@@ -171,10 +178,9 @@ def calculate_initial_probabilities(filenames, transition_matrix):
     total_num_chords = chord_counts[1].sum()
     # Create a Series from the counts
     initial_probs = pd.Series(chord_counts[1]/total_num_chords, index=chord_counts[0])
-    adapted_initials = initial_probs[transition_matrix.columns.values]
-    total_num_adapted = adapted_initials.sum()
-    adapted_initials = adapted_initials/total_num_adapted
-    return adapted_initials.fillna(0)
+    all_chords = pd.Series(np.zeros(len(FULL_CHORD_LIST)), index=FULL_CHORD_LIST)
+    all_chords.update(initial_probs)
+    return all_chords
 
 def predict(pcp, model, mu):
     """
