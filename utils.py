@@ -108,7 +108,7 @@ def calculate_chord_prob(chord_notes):
     group_count = chord_notes.groupby('following_chords').size().reset_index()
     group_count.columns = ['following_chords', 'count']
     total = group_count['count'].sum()
-    group_count['transition_probability'] = group_count['count'] / total
+    group_count['transition_probability'] = group_count['count'].astype(np.float64) / float(total)
     return group_count
 
 def calculate_transition_probabilites(chroma):
@@ -121,16 +121,17 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix = sequence_df.groupby('initial_chords').apply(calculate_chord_prob).reset_index().drop('level_1', axis=1)
 
     transition_prob_matrix = transition_prob_matrix.pivot(index='initial_chords', columns='following_chords', values='transition_probability')
-
+    '''
     # Transition probabilities for start and end states
     transition_prob_matrix['<E>'] = pd.Series(np.zeros(transition_prob_matrix.shape[1]), name='<E>')
-
+    
     transition_prob_matrix = transition_prob_matrix.fillna(0)
 
+    #TO DO: Overwriting?
     transition_prob_matrix['<S>'] = 0
     transition_prob_matrix.loc['<E>'] = 0
     transition_prob_matrix.loc['<E>', '<E>'] = 1
-
+    '''
     # Initialize a 36x36 DataFrame with zeros
     all_chords_matrix = pd.DataFrame(0, index=FULL_CHORD_LIST, columns=FULL_CHORD_LIST)
 
@@ -139,18 +140,25 @@ def calculate_transition_probabilites(chroma):
 
     # Fill any NaN values with 0
     all_chords_matrix = all_chords_matrix.fillna(0)
+
+    for chord in FULL_CHORD_LIST:
+        row = all_chords_matrix.loc[chord]
+        row_sum = row.sum()
+        if row_sum != 0:
+            row[chord] = 1
     return all_chords_matrix
 
 
-def get_initial_chord(file_name):
+def get_initial_chord(file_name, midi_data):
+    print(file_name)
     mode = midi_data[file_name]['mode']
     # check if sequence is in a minor or major scale
     if mode == 'm':
-        seq_scale = get_minor_scale(NOTES_NAMES, file_name)
+        seq_scale = get_minor_scale(NOTES_NAMES, file_name, midi_data)
     else:
-        seq_scale = get_maj_scale(NOTES_NAMES, file_name)
+        seq_scale = get_maj_scale(NOTES_NAMES, file_name, midi_data)
     # get the first chord
-    chord = list(set(get_progression(file_name)))[0]
+    chord = list(set(get_progression(file_name, midi_data)))[0]
     if chord not in seq_scale:
         # define regex pattern to get an instance of the chord
         pattern = r'\b\w*{}\w*\b'.format(re.escape(chord))
@@ -167,19 +175,25 @@ def get_initial_chord(file_name):
 
 #returns all initial probabilities, also adapts for dimensions of transition matrix
 #returns a 36x1 of probabilities for each chord
-def calculate_initial_probabilities(filenames):
+def calculate_initial_probabilities(filenames, midi_data):
     first_chords = []
     # Get all initial chords
     for file_name in filenames:
-        chord = get_initial_chord(file_name)
+        chord = get_initial_chord(file_name, midi_data)
         if chord is not None:
             first_chords.append(chord)
     chord_counts = np.unique(first_chords, return_counts=True)
     total_num_chords = chord_counts[1].sum()
     # Create a Series from the counts
-    initial_probs = pd.Series(chord_counts[1]/total_num_chords, index=chord_counts[0])
+    probabilities = chord_counts[1].astype(np.float64)/float(total_num_chords)
+    initial_probs = pd.Series(probabilities, index=chord_counts[0])
     all_chords = pd.Series(np.zeros(len(FULL_CHORD_LIST)), index=FULL_CHORD_LIST)
     all_chords.update(initial_probs)
+    diff = 1.0 - all_chords.sum()
+    if diff != 0:
+        max_index = np.argmax(all_chords)
+        all_chords.iloc[max_index] += diff
+
     return all_chords
 
 def predict(pcp, model, mu):
