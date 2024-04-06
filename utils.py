@@ -138,14 +138,21 @@ def calculate_transition_probabilites(chroma):
     # Update this matrix with the calculated transition probabilities
     all_chords_matrix.update(transition_prob_matrix)
 
+    # Normalize the rows to ensure they sum up to 1
+    for chord in all_chords_matrix.index:
+        row_sum = all_chords_matrix.loc[chord].sum()
+        if row_sum > 0:  # Ensure the row sum is greater than 0 before normalizing
+            all_chords_matrix.loc[chord] = all_chords_matrix.loc[chord] / row_sum
+        else:
+            # Handle rows that sum to 0 here
+            all_chords_matrix.loc[chord] = 1 / 36
+            pass
+
+    all_chords_matrix = all_chords_matrix.div(all_chords_matrix.sum(axis=1), axis=0)
+
     # Fill any NaN values with 0
     all_chords_matrix = all_chords_matrix.fillna(0)
 
-    for chord in FULL_CHORD_LIST:
-        row = all_chords_matrix.loc[chord]
-        row_sum = row.sum()
-        if row_sum != 0:
-            row[chord] = 1
     return all_chords_matrix
 
 
