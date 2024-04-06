@@ -4,52 +4,12 @@ import librosa as lbs
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-import librosa
-import matplotlib.pyplot as plt
 import random
 from chroma import *
-import traceback
 
+NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
 
-midi_to_note_dict = {}
-
-def midi_to_note(midi_number):
-    if midi_number not in midi_to_note_dict:
-        midi_to_note_dict[midi_number] = lbs.midi_to_note(midi_number, unicode=False)
-    return midi_to_note_dict[midi_number]
-
-
-"""
-Returns a dictionary with {piece name, details dict} 
-    dictionaries for every piece {time, (mean amplitude, [notes at that point])}
-We choose to keep the piece names here so we can later find mode or other attributes 
-using dataset[piece_name]['mode']
-"""
-def preprocess(filename):
-
-    with open(filename, 'rb') as file:
-        dataset:dict = pickle.load(file)
-    all_pieces = {}
-    for piece_name in tqdm(list(dataset.keys())):
-        notes_per_time = {}
-        piece = dataset[piece_name]
-        nmat = sorted(piece['nmat'], key=lambda note: note[0])
-        piece_length = nmat[len(nmat)-1][1] #last time of last note playing
-        for i in range(0, piece_length+1): #for each second, what notes are playing?
-            amplitudes = []
-            notes = []
-            for note in nmat:
-                if i>=note[0] and i<=note[1]: #it's in the range when the note plays
-                    amplitudes.append(note[3])
-                    notes.append(midi_to_note(note[2]))
-                elif note[0]>i: #once the start time is after i, break
-                    break
-            mean_amp = 0 if amplitudes==[] else statistics.mean(amplitudes)
-            notes_per_time[i] = (mean_amp, notes)
-        all_pieces[piece_name] = notes_per_time
-    return all_pieces
-
-#pieces_beats = preprocess()
 """
 For validation/testing, separates a given piece into x last beats and len-x previous notes/chords.
 Takes in a dictionary {beat, (mean amplitude, [notes at that point])}
@@ -84,25 +44,29 @@ def separate_for_training(dataset, train_pct, val_pct):
 
 # train, validate, test = separate_for_training(dataset, .8, .1)
 
-
-NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
-
 def calculate_mu_from_chroma(chroma):
-    ''' 
-    
-    '''
-    return chroma[NOTES_NAMES].mean()
+    mu_values = np.zeros(36)
+    for i, chord in enumerate(FULL_CHORD_LIST):
+        if chord in chroma.columns:
+            mu_values[i] = chroma[chord].mean()
+        else:
+           mu_values[i] = 0
+    return mu_values
 
 def calculate_emission_from_chroma(chroma):
-    
-    matrices = []
+    emission_matrices = np.zeros((36,36,36))
+    chord_counts = chroma['Chord Actual'].value_counts(normalize=True)
 
-    for chord, group in chroma.groupby('Chord Actual'):
-        chord_cov_matrix = group[NOTES_NAMES].cov().values
-        matrices.append(chord_cov_matrix)
-
-    return np.array(matrices)
+    for i, chord in enumerate(FULL_CHORD_LIST):
+        matrix = np.zeros((36,36))
+        # If the chord is observed in the dataset, fill its matrix diagonally
+        if chord in chord_counts:
+            np.fill_diagonal(matrix, chord_counts[chord])
+        else:
+            # For chords not present in the dataset, consider a minimal presence value
+            np.fill_diagonal(matrix, 0.01)
+        emission_matrices[i] = matrix
+    return emission_matrices
 
 def calculate_chord_prob(chord_notes):
     group_count = chord_notes.groupby('following_chords').size().reset_index()
@@ -121,17 +85,7 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix = sequence_df.groupby('initial_chords').apply(calculate_chord_prob).reset_index().drop('level_1', axis=1)
 
     transition_prob_matrix = transition_prob_matrix.pivot(index='initial_chords', columns='following_chords', values='transition_probability')
-    '''
-    # Transition probabilities for start and end states
-    transition_prob_matrix['<E>'] = pd.Series(np.zeros(transition_prob_matrix.shape[1]), name='<E>')
-    
-    transition_prob_matrix = transition_prob_matrix.fillna(0)
 
-    #TO DO: Overwriting?
-    transition_prob_matrix['<S>'] = 0
-    transition_prob_matrix.loc['<E>'] = 0
-    transition_prob_matrix.loc['<E>', '<E>'] = 1
-    '''
     # Initialize a 36x36 DataFrame with zeros
     all_chords_matrix = pd.DataFrame(0, index=FULL_CHORD_LIST, columns=FULL_CHORD_LIST)
 
@@ -165,7 +119,7 @@ def get_initial_chord(file_name, midi_data):
     else:
         seq_scale = get_maj_scale(NOTES_NAMES, file_name, midi_data)
     # get the first chord
-    chord = list(set(get_progression(file_name, midi_data)))[0]
+    chord = list(get_progression(file_name, midi_data))[0]
     if chord not in seq_scale:
         # define regex pattern to get an instance of the chord
         pattern = r'\b\w*{}\w*\b'.format(re.escape(chord))
@@ -223,6 +177,33 @@ def predict(pcp, model, mu):
     return pcp
 
 
+def new_predict(chroma, model):
+    """
+    Predict chord labels for each observation in chroma using the given HMM model.
+
+    :param chroma: DataFrame or 2D numpy array with chroma features for prediction.
+    :param model: Trained HMM model for chord prediction.
+    :param FULL_CHORD_LIST: List of chord names corresponding to model states, in the same order as model states.
+    :return: chroma with an additional column 'predictions' containing predicted chords.
+    """
+    # Making predictions using the HMM model
+    preds = model.predict(chroma)
+
+    # Mapping predicted state indices to chord names using FULL_CHORD_LIST
+    preds_str = np.array([FULL_CHORD_LIST[state] for state in preds])
+
+    # Adding predictions back to the input DataFrame or numpy array
+    if isinstance(chroma, pd.DataFrame):
+        chroma_with_preds = chroma.copy()
+        chroma_with_preds['predictions'] = preds_str
+    else:
+        # If chroma is a numpy array, concatenate the predictions as a new column
+        # Note: This requires chroma to be 2D and preds_str to be reshaped as a column vector
+        chroma_with_preds = np.hstack([chroma, preds_str.reshape(-1, 1)])
+
+    return chroma_with_preds
+
+
 def get_unique_predicted(pcp):
     """
     :param pcp: chroma, with predicted column
@@ -255,6 +236,7 @@ def format_indiv_chroma(unformatted_chroma:pd.DataFrame):
     start = pd.DataFrame([zeroed_vals[0][:-1] + [['<S>']]], columns=unformatted_chroma.columns)
     middle = unformatted_chroma
     end = pd.DataFrame([zeroed_vals[0][:-1] + [['<E>']]], columns=unformatted_chroma.columns)
+
 
     formatted_chroma = pd.concat([start, middle, end]).reset_index(drop=True)
     return formatted_chroma
