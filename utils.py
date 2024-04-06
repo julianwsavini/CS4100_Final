@@ -111,7 +111,6 @@ def calculate_transition_probabilites(chroma):
 
 
 def get_initial_chord(file_name, midi_data):
-    print(file_name)
     mode = midi_data[file_name]['mode']
     # check if sequence is in a minor or major scale
     if mode == 'm':
