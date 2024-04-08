@@ -1,7 +1,3 @@
-import pickle
-import statistics
-import librosa as lbs
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import random
@@ -10,37 +6,36 @@ from chroma import *
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
 
-"""
-For validation/testing, separates a given piece into x last beats and len-x previous notes/chords.
-Takes in a dictionary {beat, (mean amplitude, [notes at that point])}
-and x=number of beats to separate form the end
+def separate_last_chord(chromagram):
+    """
+    Separates the last chord from a chromagram.
 
-Returns tuple of two dicts: (dict_with_last_x_items, dict_with_the_rest)
-"""
-def separate_last_note_group(piece, x):
-    if x == 0 or x < 0:
-        return {}, piece
-    items = list(piece.items())
-    dict_with_last_x_items = dict(items[-x:])
-    dict_with_the_rest = dict(items[:-x])
-    return dict_with_last_x_items, dict_with_the_rest
+    Parameters:
+    - chromagram: DataFrame, a chromagram where each row is a timestep and includes chord information.
 
+    Returns:
+    - last_chord: str, the label of the last chord in the chromagram.
+    - chromagram_without_last_chord: DataFrame, the chromagram with the last chord removed.
+    """
+    if chromagram.empty:
+        return None, chromagram
+    last_chord = chromagram.iloc[-1]['Chord Actual']
+    chromagram_without_last_chord = chromagram.iloc[:-1]
+    return last_chord, chromagram_without_last_chord
 """
 Separate preprocessed data into training(80%), validation(10%), and test(10%) sets.
 Takes in a the datasdet
 Returns a tuple (training, validation, test) of lists of piece names
 """
 
-def separate_for_training(dataset, train_pct, val_pct):
+def separate_for_training(dataset, train_pct):
     pieces = list(dataset.keys())
     random.shuffle(pieces)
     train_end_idx = int(train_pct * len(pieces))
-    validate_end_idx = int((train_pct + val_pct) * len(pieces))
     train = pieces[:train_end_idx]
-    validate = pieces[train_end_idx:validate_end_idx]
-    test = pieces[validate_end_idx:]
+    test = pieces[train_end_idx:]
 
-    return train, validate, test
+    return train, test
 
 # train, validate, test = separate_for_training(dataset, .8, .1)
 
@@ -54,20 +49,35 @@ def calculate_mu_from_chroma(chroma):
     return mu_values
 
 
-def calculate_emission_from_chroma(chroma):
-    emission_matrices = np.zeros((36,36,36))
-    chord_counts = chroma['Chord Actual'].value_counts(normalize=True)
+def calculate_covariance_from_chroma(chromagram):
+    n_features = chromagram.shape[1] - 1  # Assuming last column is 'Chord Actual'
+    covariances = np.zeros((len(FULL_CHORD_LIST), n_features, n_features))
 
     for i, chord in enumerate(FULL_CHORD_LIST):
-        matrix = np.zeros((36,36))
-        # If the chord is observed in the dataset, fill its matrix diagonally
-        if chord in chord_counts:
-            np.fill_diagonal(matrix, chord_counts[chord])
+        chord_segments = chromagram[chromagram['Chord Actual'] == chord].iloc[:, :-1]
+        if not chord_segments.empty:
+            covariances[i] = np.cov(chord_segments, rowvar=False)
         else:
-            # For chords not present in the dataset, consider a minimal presence value
-            np.fill_diagonal(matrix, 0.01)
-        emission_matrices[i] = matrix
-    return emission_matrices
+            covariances[i] = np.eye(n_features)
+
+    return covariances
+
+from sklearn.decomposition import PCA
+
+def calculate_reduced_covariance_from_chroma(chromagram, n_components=12):
+    n_features = chromagram.shape[1] - 1
+    pca = PCA(n_components=n_components)
+
+    covariances = np.zeros((len(FULL_CHORD_LIST), n_components, n_components))
+
+    for i, chord in enumerate(FULL_CHORD_LIST):
+        chord_segments = chromagram[chromagram['Chord Actual'] == chord].iloc[:, :-1]
+        if not chord_segments.empty:
+            reduced_data = pca.fit_transform(chord_segments)
+            covariances[i] = np.cov(reduced_data, rowvar=False)
+        else:
+            covariances[i] = np.eye(n_components)
+    return covariances
 
 def calculate_chord_prob(chord_notes):
     group_count = chord_notes.groupby('following_chords').size().reset_index()
@@ -77,7 +87,6 @@ def calculate_chord_prob(chord_notes):
     return group_count
 
 def calculate_transition_probabilites(chroma):
-    # Look into splitting between songs somehow
     initial_chords = chroma['Chord Actual'].values[:-1]
     following_chords = chroma['Chord Actual'][1:].tolist()
 
@@ -121,12 +130,7 @@ def get_initial_chord(file_name, midi_data):
 #returns all initial probabilities, also adapts for dimensions of transition matrix
 #returns a 36x1 of probabilities for each chord
 def calculate_initial_probabilities(filenames, midi_data):
-    first_chords = []
-    # Get all initial chords
-    for file_name in filenames:
-        chord = get_initial_chord(file_name, midi_data)
-        if chord is not None:
-            first_chords.append(chord)
+    first_chords = [get_initial_chord(file_name, midi_data) for file_name in filenames if get_initial_chord(file_name, midi_data) is not None]
     chord_counts = np.unique(first_chords, return_counts=True)
     total_num_chords = chord_counts[1].sum()
     # Create a Series from the counts
@@ -158,34 +162,6 @@ def predict(pcp, model, mu):
     pcp['predictions'] = preds_str
 
     return pcp
-
-
-def new_predict(chroma, model):
-    """
-    Predict chord labels for each observation in chroma using the given HMM model.
-
-    :param chroma: DataFrame or 2D numpy array with chroma features for prediction.
-    :param model: Trained HMM model for chord prediction.
-    :param FULL_CHORD_LIST: List of chord names corresponding to model states, in the same order as model states.
-    :return: chroma with an additional column 'predictions' containing predicted chords.
-    """
-    # Making predictions using the HMM model
-    preds = model.predict(chroma)
-
-    # Mapping predicted state indices to chord names using FULL_CHORD_LIST
-    preds_str = np.array([FULL_CHORD_LIST[state] for state in preds])
-
-    # Adding predictions back to the input DataFrame or numpy array
-    if isinstance(chroma, pd.DataFrame):
-        chroma_with_preds = chroma.copy()
-        chroma_with_preds['predictions'] = preds_str
-    else:
-        # If chroma is a numpy array, concatenate the predictions as a new column
-        # Note: This requires chroma to be 2D and preds_str to be reshaped as a column vector
-        chroma_with_preds = np.hstack([chroma, preds_str.reshape(-1, 1)])
-
-    return chroma_with_preds
-
 
 def get_unique_predicted(pcp):
     """
