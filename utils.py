@@ -34,10 +34,7 @@ def separate_for_training(dataset, train_pct):
     train_end_idx = int(train_pct * len(pieces))
     train = pieces[:train_end_idx]
     test = pieces[train_end_idx:]
-
     return train, test
-
-# train, validate, test = separate_for_training(dataset, .8, .1)
 
 def calculate_mu_from_chroma(chroma):
     mu_values = np.zeros(36)
@@ -60,23 +57,6 @@ def calculate_covariance_from_chroma(chromagram):
         else:
             covariances[i] = np.eye(n_features)
 
-    return covariances
-
-from sklearn.decomposition import PCA
-
-def calculate_reduced_covariance_from_chroma(chromagram, n_components=12):
-    n_features = chromagram.shape[1] - 1
-    pca = PCA(n_components=n_components)
-
-    covariances = np.zeros((len(FULL_CHORD_LIST), n_components, n_components))
-
-    for i, chord in enumerate(FULL_CHORD_LIST):
-        chord_segments = chromagram[chromagram['Chord Actual'] == chord].iloc[:, :-1]
-        if not chord_segments.empty:
-            reduced_data = pca.fit_transform(chord_segments)
-            covariances[i] = np.cov(reduced_data, rowvar=False)
-        else:
-            covariances[i] = np.eye(n_components)
     return covariances
 
 def calculate_chord_prob(chord_notes):
