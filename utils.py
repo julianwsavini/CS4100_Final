@@ -53,6 +53,7 @@ def calculate_mu_from_chroma(chroma):
            mu_values[i] = 0
     return mu_values
 
+
 def calculate_emission_from_chroma(chroma):
     emission_matrices = np.zeros((36,36,36))
     chord_counts = chroma['Chord Actual'].value_counts(normalize=True)
@@ -111,26 +112,10 @@ def calculate_transition_probabilites(chroma):
 
 
 def get_initial_chord(file_name, midi_data):
-    mode = midi_data[file_name]['mode']
-    # check if sequence is in a minor or major scale
-    if mode == 'm':
-        seq_scale = get_minor_scale(NOTES_NAMES, file_name, midi_data)
-    else:
-        seq_scale = get_maj_scale(NOTES_NAMES, file_name, midi_data)
-    # get the first chord
-    chord = list(get_progression(file_name, midi_data))[0]
-    if chord not in seq_scale:
-        # define regex pattern to get an instance of the chord
-        pattern = r'\b\w*{}\w*\b'.format(re.escape(chord))
-        # join list of chords into a single string to parse for regex and replace in chroma labels
-        # each seq_scale is of length 7
-        scale_to_string = (' ').join(seq_scale)
-        # find true chord
-        found_chords = re.findall(pattern, scale_to_string, flags=re.IGNORECASE)
-        if found_chords:
-            chord = found_chords[0]
-        else:
-            return None
+    chords_in_file = get_chord_labels(file_name, midi_data)
+    if len(chords_in_file) == 0:
+        return None
+    chord = get_chord_labels(file_name, midi_data)[0]
     return chord
 
 #returns all initial probabilities, also adapts for dimensions of transition matrix
@@ -153,7 +138,6 @@ def calculate_initial_probabilities(filenames, midi_data):
     if diff != 0:
         max_index = np.argmax(all_chords)
         all_chords.iloc[max_index] += diff
-
     return all_chords
 
 def predict(pcp, model, mu):
