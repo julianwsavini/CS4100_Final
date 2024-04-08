@@ -46,7 +46,7 @@ def calculate_mu_from_chroma(chroma):
             mu_values[i] = chroma[chord].mean()
         else:
            mu_values[i] = 0
-    return mu_values
+    return pd.DataFrame(pd.Series(mu_values))
 
 
 def calculate_covariance_from_chroma(chromagram):
@@ -97,7 +97,7 @@ def calculate_transition_probabilites(chroma):
     transition_prob_matrix = transition_prob_matrix.pivot(index='initial_chords', columns='following_chords', values='transition_probability')
 
     # Initialize a 36x36 DataFrame with zeros
-    all_chords_matrix = pd.DataFrame(0, index=FULL_CHORD_LIST, columns=FULL_CHORD_LIST)
+    all_chords_matrix = pd.DataFrame(0., index=FULL_CHORD_LIST, columns=FULL_CHORD_LIST)
 
     # Update this matrix with the calculated transition probabilities
     all_chords_matrix.update(transition_prob_matrix)
@@ -109,13 +109,13 @@ def calculate_transition_probabilites(chroma):
             all_chords_matrix.loc[chord] = all_chords_matrix.loc[chord] / row_sum
         else:
             # Handle rows that sum to 0 here
-            all_chords_matrix.loc[chord] = 1 / 36
+            all_chords_matrix.loc[chord] = float(1 / 36)
             pass
 
     all_chords_matrix = all_chords_matrix.div(all_chords_matrix.sum(axis=1), axis=0)
 
-    # Fill any NaN values with 0
-    all_chords_matrix = all_chords_matrix.fillna(0)
+    # Fill any NaN values with 0.
+    all_chords_matrix = all_chords_matrix.fillna(0.)
 
     return all_chords_matrix
 
