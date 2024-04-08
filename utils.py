@@ -179,3 +179,28 @@ def format_indiv_chroma(unformatted_chroma:pd.DataFrame):
 
     formatted_chroma = pd.concat([start, middle, end]).reset_index(drop=True)
     return formatted_chroma
+
+
+def chord_distance_with_quality(chord1, chord2):
+    note_to_semitone = {
+        "C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
+        "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11
+    }
+    quality_weight = {
+        ('', ''): 0,
+        ('', 'm'): 1, ('m', ''): 1,
+        ('', 'dim'): 2, ('dim', ''): 2,
+        ('m', 'dim'): 1, ('dim', 'm'): 1,
+    }
+
+    root1, quality1 = chord1[:2] if chord1[1:2] == '#' else chord1[0], chord1[2:]
+    root2, quality2 = chord2[:2] if chord2[1:2] == '#' else chord2[0], chord2[2:]
+
+    pos1 = note_to_semitone.get(root1, 0)
+    pos2 = note_to_semitone.get(root2, 0)
+
+    semitone_distance = min(abs(pos1 - pos2), 12 - abs(pos1 - pos2))
+    quality_distance = quality_weight.get((quality1, quality2), 2)  # Default to 2 if combination not in weight dictionary
+    distance = semitone_distance + quality_distance
+
+    return distance
