@@ -5,18 +5,10 @@ from chroma import *
 
 NOTES_NAMES =   ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 FULL_CHORD_LIST = [note + suffix for note in NOTES_NAMES for suffix in ['', 'm', 'dim']]
+CUSTOM_ENCODING = {chord: i for i, chord in enumerate(FULL_CHORD_LIST)}
+INVERSE_ENCODING = {val: key for key, val in CUSTOM_ENCODING.items()}
 
 def separate_last_chord(chromagram):
-    """
-    Separates the last chord from a chromagram.
-
-    Parameters:
-    - chromagram: DataFrame, a chromagram where each row is a timestep and includes chord information.
-
-    Returns:
-    - last_chord: str, the label of the last chord in the chromagram.
-    - chromagram_without_last_chord: DataFrame, the chromagram with the last chord removed.
-    """
     if chromagram.empty:
         return None, chromagram
     last_chord = chromagram.iloc[-1]['Chord Actual']
@@ -181,6 +173,23 @@ def format_indiv_chroma(unformatted_chroma:pd.DataFrame):
     return formatted_chroma
 
 
+def predict_next_chords(model, start_chroma, n_predictions):
+    current_chroma_df = start_chroma.copy()
+    predictions = []
+    for _ in range(n_predictions):
+        encoded_c = current_chroma_df['Chord Actual'].apply(lambda x: CUSTOM_ENCODING.get(x, -1)).values.reshape(-1, 1)
+        next_chord = model.predict(encoded_c)[-1]
+
+        next_chord_name = [chord for chord, encoding in CUSTOM_ENCODING.items() if encoding == next_chord][0]
+        predictions.append(next_chord_name)
+        #update chroma for next round
+        new_row = pd.DataFrame([[next_chord_name]], columns=['Chord Actual'])
+        current_chroma_df = pd.concat([current_chroma_df, new_row], ignore_index=True)
+
+    return predictions
+
+
+
 def chord_distance_with_quality(chord1, chord2):
     note_to_semitone = {
         "C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
@@ -204,3 +213,16 @@ def chord_distance_with_quality(chord1, chord2):
     distance = semitone_distance + quality_distance
 
     return distance
+
+def mean_chord_distance_with_quality(predicted, actual):
+    # predicted and actual are arrays that
+    # each hold chords in order where each indedx holds matching items
+    total_distance = 0
+    num_pairs = len(predicted)
+
+    for i in range(num_pairs):
+        distance = chord_distance_with_quality(predicted[i], actual[i])
+        total_distance += distance
+
+    avg_distance = total_distance / num_pairs if num_pairs > 0 else 0
+    return avg_distance
