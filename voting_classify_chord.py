@@ -37,7 +37,7 @@ rf_classifier.fit(X_train_scaled, y_train)
 voting_classifier = VotingClassifier(estimators=[('knn', knn_classifier), ('dt', dt_classifier), ('rf', rf_classifier)], voting='soft')
 voting_classifier.fit(X_train_scaled, y_train)
 
-pickle.dump(voting_classifier, open('voting.pkl', "wb"))
+#pickle.dump(voting_classifier, open('voting.pkl', "wb"))
 
 # # Make predictions on the test set
 y_pred = voting_classifier.predict(X_test_scaled)
