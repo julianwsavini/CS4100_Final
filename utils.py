@@ -9,18 +9,23 @@ CUSTOM_ENCODING = {chord: i for i, chord in enumerate(FULL_CHORD_LIST)}
 INVERSE_ENCODING = {val: key for key, val in CUSTOM_ENCODING.items()}
 
 def separate_last_chord(chromagram):
+    '''
+    Isolate the final chord from a chromagram.
+    :param chromagram: DataFrame containing the chromagram
+    :returns: (str, DataFrame) isolated last chord, DataFrame with final chord row removed
+    '''
     if chromagram.empty:
         return None, chromagram
     last_chord = chromagram.iloc[-1]['Chord Actual']
     chromagram_without_last_chord = chromagram.iloc[:-1]
     return last_chord, chromagram_without_last_chord
-"""
-Separate preprocessed data into training(80%), validation(10%), and test(10%) sets.
-Takes in a the datasdet
-Returns a tuple (training, validation, test) of lists of piece names
-"""
 
 def separate_for_training(dataset, train_pct):
+    """
+    Separate preprocessed data into training(80%), validation(10%), and test(10%) sets.
+    Takes in a the datasdet
+    Returns a tuple (training, validation, test) of lists of piece names
+    """
     pieces = list(dataset.keys())
     random.shuffle(pieces)
     train_end_idx = int(train_pct * len(pieces))
@@ -29,6 +34,11 @@ def separate_for_training(dataset, train_pct):
     return train, test
 
 def calculate_mu_from_chroma(chroma):
+    ''' 
+    Calculate the mu value from the given chromagram.
+    :param chroma: DataFrame containing the chromagram
+    :returns: DataFrame containing the calculated mu value, will contain rows for all 36 chords (maj, min, dim)
+    '''
     mu_values = np.zeros(36)
     for i, chord in enumerate(FULL_CHORD_LIST):
         if chord in chroma.columns:
@@ -39,6 +49,11 @@ def calculate_mu_from_chroma(chroma):
 
 
 def calculate_covariance_from_chroma(chromagram):
+    ''' 
+    Calculate a covariance matrix from the given chromagram.
+    :param chromagram: DataFrame containing chromagram with 'Chord Actual' as the final column
+    :returns: covariance matrix (shape 36,36) for all chords
+    '''
     n_features = chromagram.shape[1] - 1  # Assuming last column is 'Chord Actual'
     covariances = np.zeros((len(FULL_CHORD_LIST), n_features, n_features))
 
@@ -52,6 +67,13 @@ def calculate_covariance_from_chroma(chromagram):
     return covariances
 
 def calculate_chord_prob(chord_notes):
+    ''' 
+    Helper function for transition probabilities. Calculates
+    the probability of moving from one chord to another.
+    Takes in a DataFrameGroupBy object.
+    :param chord_notes: DataFrameGroupBy object from which transition probabilties for the grouped by chord are calculated.
+    :returns: Series object consisting of transition probabilities between chords
+    '''
     group_count = chord_notes.groupby('following_chords').size().reset_index()
     group_count.columns = ['following_chords', 'count']
     total = group_count['count'].sum()
@@ -59,6 +81,11 @@ def calculate_chord_prob(chord_notes):
     return group_count
 
 def calculate_transition_probabilites(chroma):
+    ''' 
+    Create a transition probability matrix from the given chromagram.
+    :param chroma: concatenated chromagram of all training songs
+    :returns: 36x36 transition probability matrix for each chord (maj, min, dim)
+    '''
     initial_chords = chroma['Chord Actual'].values[:-1]
     following_chords = chroma['Chord Actual'][1:].tolist()
 
@@ -93,6 +120,12 @@ def calculate_transition_probabilites(chroma):
 
 
 def get_initial_chord(file_name, midi_data):
+    '''
+    For a song with the given file_name in midi_data, return the initial chord of that song.
+    :param file_name: string file name of the song
+    :param midi_data: dictionary with file_name as the key and MIDI data as the value
+    :returns: string of the initial chord from the given song
+    '''
     chords_in_file = get_chord_labels(file_name, midi_data)
     if len(chords_in_file) == 0:
         return None
@@ -102,6 +135,12 @@ def get_initial_chord(file_name, midi_data):
 #returns all initial probabilities, also adapts for dimensions of transition matrix
 #returns a 36x1 of probabilities for each chord
 def calculate_initial_probabilities(filenames, midi_data):
+    ''' 
+    Create an initial probability matrix from all of the files contained within filenames that are in midi_data.
+    :param filenames: list of string filenames for songs from which initial probablities are calculated
+    :param midi_data: dictionary with file names as keys, MIDI data as values
+    :returns: a 36x1 matrix of initial probabilities for each chord
+    '''
     first_chords = [get_initial_chord(file_name, midi_data) for file_name in filenames if get_initial_chord(file_name, midi_data) is not None]
     chord_counts = np.unique(first_chords, return_counts=True)
     total_num_chords = chord_counts[1].sum()
