@@ -199,7 +199,7 @@ def chord_distance_with_quality(chord1, chord2):
     pos1 = note_to_semitone.get(root1, 0)
     pos2 = note_to_semitone.get(root2, 0)
 
-    semitone_distance = min(abs(pos1 - pos2), 12 - abs(pos1 - pos2))
+    semitone_distance = min(pos1 - pos2, 12 - (pos1 - pos2))
     quality_distance = quality_weight.get((quality1, quality2), 2)  # Default to 2 if combination not in weight dictionary
     distance = semitone_distance + quality_distance
 
