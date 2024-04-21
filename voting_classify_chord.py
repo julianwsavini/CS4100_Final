@@ -16,7 +16,7 @@ outputs = all_chromas['Chord Actual']
 inputs = all_chromas.drop(labels=['Chord Actual'], axis=1)
 X_train, X_test, y_train, y_test = train_test_split(inputs, outputs, test_size=0.2)
 
-# Step 2: Feature scaling
+# step 2: Feature scaling
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
@@ -37,20 +37,23 @@ rf_classifier.fit(X_train_scaled, y_train)
 voting_classifier = VotingClassifier(estimators=[('knn', knn_classifier), ('dt', dt_classifier), ('rf', rf_classifier)], voting='soft')
 voting_classifier.fit(X_train_scaled, y_train)
 
-#pickle.dump(voting_classifier, open('voting.pkl', "wb"))
+# write model to pkl file
+pickle.dump(voting_classifier, open('voting.pkl', "wb"))
 
-# # Make predictions on the test set
+# make predictions on the test set
 y_pred = voting_classifier.predict(X_test_scaled)
 accuracy = accuracy_score(y_test, y_pred)
 print(f'Accuracy: {accuracy}')
 conf_matrix = confusion_matrix(y_test, y_pred)
 labels = list(np.unique(y_pred))
+# plot confusion matrix 
 plt.figure(figsize=(6, 4))
-sns.heatmap(conf_matrix, cmap='YlGnBu', fmt='d', cbar=False, xticklabels=labels, yticklabels=labels)
+sns.heatmap(conf_matrix, cmap='viridis', fmt='d', cbar=False, xticklabels=labels, yticklabels=labels)
 plt.xlabel('Predicted labels')
 plt.ylabel('True labels')
 plt.title('Confusion Matrix')
 plt.show()
+
 # t_z = np.zeros(12)
 # t_z[11] = 80
 # t_z[2] = 90

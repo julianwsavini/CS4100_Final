@@ -12,7 +12,6 @@ with open(r"dataset.pkl", 'rb') as data:
     midi_data:dict = pickle.load(data)
 
 def get_model():
-
     training_piece_names, test_piece_names = separate_for_training(midi_data, 0.8)
 
     song_chromagrams = []
