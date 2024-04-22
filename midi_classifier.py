@@ -11,17 +11,17 @@ warnings.filterwarnings(action='ignore')
 import fluidsynth
 
 # Initialize FluidSynth
-soundfont = r"undertale.sf2"
+soundfont = r"/Users/giannamattessich/Downloads/undertale.sf2"
 synth = fluidsynth.Synth()
 synth.start()
 # load a soundfont -> accepted file types: .sf2, .sf3
 sfid = synth.sfload(soundfont)
 # select sound font and initialize synth
 synth.program_select(0, sfid, 0, 0)
-fluidsynth.init(soundfont)
+#fluidsynth.init(soundfont)
 # load the saved classifier model from the file
 vote_classifier = pickle.load(open('voting.pkl', "rb"))
-notes = ["C", "C#/Db", "D", "D#", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"]
+notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 # dict to represent active notes and their amplitudes, resets at each note off event
 active_notes = {}
 
@@ -38,6 +38,7 @@ def get_input_for_pred(active_notes):
     scaled_input = pd.DataFrame(input_vect).transpose()
     scaled_input.columns = notes
     return scaled_input
+
 num_chord = 0
 model = get_model()
 # initialize an empty chromagram of length 16th to add each change in chord 

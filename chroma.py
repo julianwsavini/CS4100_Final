@@ -144,7 +144,7 @@ def get_chromagram(midi_seq, midi_data):
     chroma_map['Chord Actual'] = get_chord_labels(midi_seq, midi_data)
     # filter out sequences that have nothing at end 
     chroma_map = chroma_map.loc[(chroma_map.loc[:, notes] != 0).any(axis=1)]
-    chroma_map = normalize_chroma(chroma_map)
+    #chroma_map = normalize_chroma(chroma_map)
     return chroma_map
 
 '''

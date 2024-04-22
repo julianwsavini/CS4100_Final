@@ -22,14 +22,14 @@ X_test_scaled = scaler.transform(X_test)
 
 # Assuming X_train, X_test are your input data and y_train, y_test are the corresponding labels
 # Initialize and train the Decision Tree Classifier
-dt_classifier = DecisionTreeClassifier(random_state=65)
+dt_classifier = DecisionTreeClassifier(random_state=75)
 dt_classifier.fit(X_train_scaled, y_train)
 
 # Initialize base classifiers
-knn_classifier = KNeighborsClassifier(n_neighbors=3)
+knn_classifier = KNeighborsClassifier(n_neighbors=10)
 knn_classifier.fit(X_train_scaled, y_train)
 
-rf_classifier = RandomForestClassifier(n_estimators=100, random_state=65)
+rf_classifier = RandomForestClassifier(n_estimators=100, random_state=75)
 rf_classifier.fit(X_train_scaled, y_train)
 
 # Create a Voting Classifier with the base classifiers
