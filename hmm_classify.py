@@ -7,11 +7,12 @@ import numpy as np
 from hmmlearn import hmm
 
 
-# Load data and split into training and test
+# Load data
 with open(r"dataset.pkl", 'rb') as data:
     midi_data:dict = pickle.load(data)
 
 def get_model():
+    """Split the data into testing and training, make a GaussianHMM"""
     training_piece_names, test_piece_names = separate_for_training(midi_data, 0.8)
 
     song_chromagrams = []
@@ -36,16 +37,4 @@ def get_model():
     model.n_features = 36
     return model
 
-def predict_next_chords(model, start_chroma, n_predictions):
-    current_chroma_df = start_chroma.copy()
-    predictions = []
-    for _ in range(n_predictions):
-        encoded_c = current_chroma_df['Chord Actual'].apply(lambda x: CUSTOM_ENCODING.get(x, -1)).values.reshape(-1, 1)
-        next_chord = model.predict(encoded_c)[-1]
 
-        next_chord_name = [chord for chord, encoding in CUSTOM_ENCODING.items() if encoding == next_chord][0]
-        predictions.append(next_chord_name)
-        #update chroma for next round
-        new_row = pd.DataFrame([[next_chord_name]], columns=['Chord Actual'])
-        current_chroma_df = pd.concat([current_chroma_df, new_row], ignore_index=True)
-    return predictions

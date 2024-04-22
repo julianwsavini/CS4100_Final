@@ -5,7 +5,8 @@ import pandas as pd
 import librosa
 import pickle
 import warnings
-from hmm_classify import predict_next_chords, get_model
+from hmm_classify import get_model
+from utils import predict_next_chords
 warnings.filterwarnings(action='ignore')
 import fluidsynth
 

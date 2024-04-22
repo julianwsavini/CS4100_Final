@@ -8,7 +8,6 @@ from sklearn.ensemble import VotingClassifier, RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 import pickle
 import matplotlib.pyplot as plt
-import seaborn as sns
 import seaborn as sns 
 
 all_chromas = pd.concat([get_chromagram(sample, midi_data) for sample in list(midi_data.keys())])
