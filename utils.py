@@ -201,8 +201,11 @@ def get_unique_predicted(pcp):
     return filtered_preds[['predictions', 'start', 'end']]
 
 def format_indiv_chroma(unformatted_chroma:pd.DataFrame):
-    # TODO: determine what values go in the start and end rows
-    zeroed_vals = [[0 for i in range(unformatted_chroma.shape[1])]]
+    ''' 
+    Adds start and end rows to the given chromagram. 
+    Used to ensure that the overall transition matrix does not associate the end note of song n with the start note of song n+1.
+    '''
+    zeroed_vals = [[0 for _ in range(unformatted_chroma.shape[1])]]
     start = pd.DataFrame([zeroed_vals[0][:-1] + [['<S>']]], columns=unformatted_chroma.columns)
     middle = unformatted_chroma
     end = pd.DataFrame([zeroed_vals[0][:-1] + [['<E>']]], columns=unformatted_chroma.columns)
@@ -213,6 +216,14 @@ def format_indiv_chroma(unformatted_chroma:pd.DataFrame):
 
 
 def predict_next_chords(model, start_chroma, n_predictions):
+    '''
+    For the given number of predictions, take the given start of the song as a chromagram and predict that number of notes
+    using the given model.
+    :param model: model with which to make the predictions 
+    :param start_chroma: beginning of the chord progression as a chromagram
+    :param n_predictions: how many chord predictions to make
+    :returns: list of predicted chords of size n_predictions
+    '''
     current_chroma_df = start_chroma.copy()
     predictions = []
     for _ in range(n_predictions):
@@ -221,6 +232,7 @@ def predict_next_chords(model, start_chroma, n_predictions):
 
         next_chord_name = [chord for chord, encoding in CUSTOM_ENCODING.items() if encoding == next_chord][0]
         predictions.append(next_chord_name)
+        
         #update chroma for next round
         new_row = pd.DataFrame([[next_chord_name]], columns=['Chord Actual'])
         current_chroma_df = pd.concat([current_chroma_df, new_row], ignore_index=True)
@@ -230,6 +242,15 @@ def predict_next_chords(model, start_chroma, n_predictions):
 
 
 def chord_distance_with_quality(chord1, chord2):
+    '''
+    Calculate the chord distance between the given chords.
+    Based on the Levitshein word distance concept.
+    Chords can be different in semitones (wrong letter) and their quality (major vs diminished).
+    Computes the semitone and quality difference and returns the sum of the two.
+
+    :params chord1, chord2: chords as strings (ex: "C# dim)
+    :returns: int distance between the two given chords 
+    '''
     note_to_semitone = {
         "C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5,
         "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11
@@ -256,6 +277,13 @@ def chord_distance_with_quality(chord1, chord2):
 def mean_chord_distance_with_quality(predicted, actual):
     # predicted and actual are arrays that
     # each hold chords in order where each indedx holds matching items
+    '''
+    Calculate the mean difference between two sequences of chords.
+
+    :param predicted: predicted sequence of chords as strings
+    :param actual: actual ground truth sequence of chords as strings
+    :returns: mean chord distance across the sequence
+    '''
     total_distance = 0
     num_pairs = len(predicted)
 
